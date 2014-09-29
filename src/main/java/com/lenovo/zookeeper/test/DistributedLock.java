@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -18,7 +19,7 @@ import org.jboss.netty.util.TimerTask;
 
 public class DistributedLock implements Lock{
 
-	final static AtomicInteger index = new AtomicInteger(0);
+	final static AtomicLong index = new AtomicLong(0);
 	final static HashedWheelTimer scheduler = new HashedWheelTimer();
 	private Object localLock;
 	private static final String LOCK = "lock";
@@ -33,15 +34,21 @@ public class DistributedLock implements Lock{
 	public DistributedLock(String connectionString)throws Exception{
 		this.client = new ZkClient(connectionString);
 		this.localLock = new Object();
-		this.lockIndex =  index.getAndIncrement()+"";
+
 		try {
 			client.createPersistent(LOCK_PATH);
 		} catch (ZkNodeExistsException e) {
 		}
-		domain = LOCK_PATH +"/"+ lockIndex;
-		try {
-			client.delete(domain);
-		} catch (Exception e1) {
+		boolean continueDelete = true;
+		while(continueDelete){
+			this.lockIndex =  index.getAndIncrement()+"";
+			domain = LOCK_PATH +"/"+ lockIndex;
+			try {
+				client.delete(domain);
+				continueDelete = false;
+			} catch (Exception e1) {
+				continueDelete = true;
+			}
 		}
 		try {
 			client.createPersistent(domain);
@@ -60,7 +67,7 @@ public class DistributedLock implements Lock{
 						break;
 					}else{
 						try {
-							localLock.wait(100);
+							localLock.wait(10);
 						} catch (InterruptedException e) {
 							e.printStackTrace();
 						}
@@ -96,7 +103,7 @@ public class DistributedLock implements Lock{
 					break;
 				}else{
 					try {
-						localLock.wait(100);
+						localLock.wait(10);
 					} catch (InterruptedException e) {
 						throw e;
 					}
@@ -141,7 +148,7 @@ public class DistributedLock implements Lock{
 					break;
 				}
 				try {
-					localLock.wait(100);
+					localLock.wait(10);
 				} catch (InterruptedException e) {
 					throw e;
 				}
