@@ -19,7 +19,6 @@ import org.jboss.netty.util.TimerTask;
 
 public class DistributedLock implements Lock{
 
-	final static AtomicLong index = new AtomicLong(0);
 	final static HashedWheelTimer scheduler = new HashedWheelTimer();
 	private Object localLock;
 	private static final String LOCK = "lock";
@@ -31,7 +30,7 @@ public class DistributedLock implements Lock{
 	private String domain;
 	private String lockPath;
 	
-	public DistributedLock(String connectionString)throws Exception{
+	public DistributedLock(String connectionString, String lockString)throws Exception{
 		this.client = new ZkClient(connectionString);
 		this.localLock = new Object();
 
@@ -39,17 +38,8 @@ public class DistributedLock implements Lock{
 			client.createPersistent(LOCK_PATH);
 		} catch (ZkNodeExistsException e) {
 		}
-		boolean continueDelete = true;
-		while(continueDelete){
-			this.lockIndex =  index.getAndIncrement()+"";
-			domain = LOCK_PATH +"/"+ lockIndex;
-			try {
-				client.delete(domain);
-				continueDelete = false;
-			} catch (Exception e1) {
-				continueDelete = true;
-			}
-		}
+		this.lockIndex =  lockString;
+		domain = LOCK_PATH +"/"+ lockIndex;
 		try {
 			client.createPersistent(domain);
 		} catch (ZkNodeExistsException e) {
@@ -163,22 +153,10 @@ public class DistributedLock implements Lock{
 			client.delete(currentPath.get());
 			localLock.notifyAll();
 		}
-
 	}
 
 	public Condition newCondition() {
 		return null;
-	}
-	@Override
-	protected void finalize() throws Throwable {
-		try {
-			super.finalize();
-		} catch (Exception e) {
-			throw e;
-		}finally{
-			this.client.delete(domain);
-		}
-		
 	}
 	
 	

@@ -10,7 +10,7 @@ public class Test extends Thread{
 	
 	public Test() {
 		try {
-			lock = new DistributedLock("103.249.129.24:2181,103.249.129.25:2181,103.249.129.26:2181");
+			lock = new DistributedLock("103.249.129.24:2181,103.249.129.25:2181,103.249.129.26:2181","test");
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
