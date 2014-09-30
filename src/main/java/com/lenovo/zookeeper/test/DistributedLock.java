@@ -9,6 +9,7 @@ import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.I0Itec.zkclient.IZkChildListener;
 import org.I0Itec.zkclient.ZkClient;
 import org.I0Itec.zkclient.exception.ZkNodeExistsException;
 import org.apache.zookeeper.KeeperException;
@@ -23,17 +24,16 @@ public class DistributedLock implements Lock{
 	private Object localLock;
 	private static final String LOCK = "lock";
 	private static final String LOCK_PATH = "/" + LOCK;
-	private ZkClient client;
+	private final ZkClient client;
 	private final static ThreadLocal<String> currentPath = new ThreadLocal<String>();;
 	
 	private String lockIndex;
 	private String domain;
-	private String lockPath;
-	
+	private final String lockPath;
+	private IZkChildListener listener;
 	public DistributedLock(String connectionString, String lockString)throws Exception{
 		this.client = new ZkClient(connectionString);
 		this.localLock = new Object();
-
 		try {
 			client.createPersistent(LOCK_PATH);
 		} catch (ZkNodeExistsException e) {
@@ -45,8 +45,24 @@ public class DistributedLock implements Lock{
 		} catch (ZkNodeExistsException e) {
 		}
 		lockPath = domain + LOCK_PATH;
-		
+		listener = new IZkChildListener(){
+			@Override
+			public void handleChildChange(String parentPath,
+					List<String> currentChilds) throws Exception {
+				if(currentChilds == null || currentChilds.size() == 0){
+					//delete this lock;
+					client.delete(domain);
+				}else{
+					synchronized(localLock){
+						localLock.notifyAll();
+					}
+				}
+			}
+			
+		};
+		client.subscribeChildChanges(domain, listener);
 	}
+	
 	public void lock() {
 			synchronized(localLock) {				
 				currentPath.set(client.createEphemeralSequential(lockPath, ""));
@@ -57,7 +73,7 @@ public class DistributedLock implements Lock{
 						break;
 					}else{
 						try {
-							localLock.wait(10);
+							localLock.wait();
 						} catch (InterruptedException e) {
 							e.printStackTrace();
 						}
@@ -93,7 +109,7 @@ public class DistributedLock implements Lock{
 					break;
 				}else{
 					try {
-						localLock.wait(10);
+						localLock.wait();
 					} catch (InterruptedException e) {
 						throw e;
 					}
@@ -138,7 +154,7 @@ public class DistributedLock implements Lock{
 					break;
 				}
 				try {
-					localLock.wait(10);
+					localLock.wait();
 				} catch (InterruptedException e) {
 					throw e;
 				}
