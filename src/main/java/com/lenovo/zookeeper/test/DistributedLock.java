@@ -64,8 +64,10 @@ public class DistributedLock implements Lock{
 	}
 	
 	public void lock() {
-			synchronized(localLock) {				
-				currentPath.set(client.createEphemeralSequential(lockPath, ""));
+			synchronized(localLock) {
+				if(currentPath.get() == null || !client.exists(currentPath.get())){
+					currentPath.set(client.createEphemeralSequential(lockPath, ""));
+				}
 				while(true){
 					List<String> paths = client.getChildren(domain);
 					String minPath = getMinPath(LOCK, paths);
@@ -79,8 +81,8 @@ public class DistributedLock implements Lock{
 						}
 					}
 				}
-				
-			}
+			}	
+
 
 	}
 
@@ -101,7 +103,9 @@ public class DistributedLock implements Lock{
 	
 	public void lockInterruptibly() throws InterruptedException {
 		synchronized(localLock) {
-			currentPath.set(client.createEphemeralSequential(lockPath, ""));
+			if(currentPath.get() == null || !client.exists(currentPath.get())){
+				currentPath.set(client.createEphemeralSequential(lockPath, ""));
+			}
 			while(true){
 				List<String> paths = client.getChildren(domain);
 				String minPath = getMinPath(LOCK ,paths);
@@ -122,7 +126,9 @@ public class DistributedLock implements Lock{
 	public boolean tryLock() {
 		boolean flag = false;
 		synchronized(localLock) {
-			currentPath.set(client.createEphemeralSequential(lockPath, ""));
+			if(currentPath.get() == null || !client.exists(currentPath.get())){
+				currentPath.set(client.createEphemeralSequential(lockPath, ""));
+			}
 			List<String> paths = client.getChildren(domain);
 			String minPath = getMinPath(LOCK, paths);
 			if(minPath != null && currentPath.get() != null && currentPath.get().endsWith(minPath)){
@@ -136,7 +142,9 @@ public class DistributedLock implements Lock{
 			throws InterruptedException {
 		boolean flag = false;
 		synchronized(localLock) {
-			currentPath.set(client.createEphemeralSequential(lockPath, ""));
+			if(currentPath.get() == null || !client.exists(currentPath.get())){
+				currentPath.set(client.createEphemeralSequential(lockPath, ""));
+			}
 			final AtomicBoolean running = new AtomicBoolean(true);
 			TimerTask task = new TimerTask(){
 				public void run(Timeout timeout) throws Exception {
