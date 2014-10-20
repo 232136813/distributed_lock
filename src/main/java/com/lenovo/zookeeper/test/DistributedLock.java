@@ -68,6 +68,7 @@ public class DistributedLock implements Lock{
 				if(currentPath.get() == null || !client.exists(currentPath.get())){
 					currentPath.set(client.createEphemeralSequential(lockPath, ""));
 				}
+				boolean interrupted = false;
 				while(true){
 					List<String> paths = client.getChildren(domain);
 					String minPath = getMinPath(LOCK, paths);
@@ -78,8 +79,12 @@ public class DistributedLock implements Lock{
 							localLock.wait();
 						} catch (InterruptedException e) {
 							e.printStackTrace();
+							interrupted = true;
 						}
 					}
+				}
+				if(interrupted){
+					Thread.currentThread().interrupt();
 				}
 			}	
 
